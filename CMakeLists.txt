@@ -12,7 +12,7 @@ if (NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Weffc++ -Wshadow")
+set(CMAKE_CXX_FLAGS "-std=c++11 -O2 -g3 -fmessage-length=0 -Wall")
 
 
 
