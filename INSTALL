@@ -1,0 +1,22 @@
+This software needs cmake >= 2.8 to build.
+
+The dependencies include:
+- Bio++ libraries: bpp-core, seq, phyl
+- The GSL library.
+
+After installing cmake, run it with the following command:
+cmake -DCMAKE_INSTALL_PREFIX=[where to install, for instance /usr/local or $HOME/.local] .
+
+If available, you can also use ccmake instead of cmake for a more user-friendly interface.
+
+Then compile and install the software with
+make install
+
+In order to build standalone executable, run
+
+cmake -DBUILD_STATIC=yes -DCMAKE_INSTALL_PREFIX=[where to install, for instance /usr/local or $HOME/.local] .
+
+or use the ccmake terminal interface.
+
+You may also consider installing and using the software checkinstall for easier system administration.
+

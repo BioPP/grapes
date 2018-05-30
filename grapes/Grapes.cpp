@@ -19,9 +19,9 @@
 #include <Bpp/Phyl/Likelihood/PseudoNewtonOptimizer.h>
 
 
-#include <gsl_sf.h>
-#include <gsl_randist.h>
-#include <gsl_cdf.h>
+#include <gsl/gsl_sf.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 using namespace bpp;
 
