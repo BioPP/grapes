@@ -30,7 +30,7 @@ Compilation can be achieved using **cmake**:
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREIX=$HOME/.local ..
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local ..
 make make
 ```
 See the INSTALL file and cmake documentation for more detailed instructions.
