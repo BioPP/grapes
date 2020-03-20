@@ -4,8 +4,7 @@
 #include <math.h>
 #include <time.h>
 
-#include <limits.h>
-#include <values.h>
+#include <limits>
 
 #include <Bpp/App/ApplicationTools.h>
 #include <Bpp/Text/StringTokenizer.h>
@@ -1860,11 +1859,11 @@ public:
   bpp_SFS_minus_lnl(struct onelocus_data* d, struct model* m) : AbstractParametrizable(""), data(d)
   {
 // cout <<"fct constructor" <<endl;
-    for (unsigned int i = 0; i < m->param_name.size(); i++)
+    for (size_t i = 0; i < m->param_name.size(); i++)
     {
       if (m->optimized[m->param_name[i]] == false) continue;
       double val, cd, cu;
-      IntervalConstraint* ic;
+      shared_ptr<IntervalConstraint> ic;
       if (m->reparametrization[i] == "log")
       {
         cd = log(m->constraint[i][0]);
@@ -1876,7 +1875,7 @@ public:
         cu = m->constraint[i][1];
       }
       val = (cd + cu) / 2.;
-      ic = new IntervalConstraint(cd, cu, true, true, prec);
+      ic.reset(new IntervalConstraint(cd, cu, true, true, prec));
       addParameter_(new Parameter(m->param_name[i], val, ic));
     }
   }
@@ -2101,7 +2100,7 @@ void optimize_DFEM(struct onelocus_data* data, struct model* m, struct parameter
   // optimization
 
   ParameterList pl, opt_pl;
-  double lnL, maxlnL = -DBL_MAX;
+  double lnL, maxlnL = -std::numeric_limits<double>::max();
 
   for (unsigned int i = 0; i < v_init_p.size(); i++)
   {
@@ -2114,7 +2113,7 @@ void optimize_DFEM(struct onelocus_data* data, struct model* m, struct parameter
     }
   }
 
-  if (maxlnL == -DBL_MAX)
+  if (maxlnL == -std::numeric_limits<double>::max())
     fin("Sorry: optimization failed; try more starting values\n");
 
 
