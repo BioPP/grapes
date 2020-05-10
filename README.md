@@ -75,7 +75,7 @@ different lines of the DoFE file (see examples at the bottom of this file)
 Analysis
 --------
 **grapes** will estimate the distribution of fitness effect of mutations (DFE), rate of adaptive evolution
-(w[a]), rate of non-adaptive evolution (w[na]), and proportion of adaptive substitutions (a) by fitting a
+(<img src="https://render.githubusercontent.com/render/math?math=\omega_a">), rate of non-adaptive evolution (w[na]), and proportion of adaptive substitutions (a) by fitting a
 population genetic model to SFS + divergence data in the maximum likelihood framework. grapes will
 also perform more basic analyses, namely estimating a as 1 – [(p N /p S )/(d N /d S )], referred to as Neutral
 model, and using the corrected version of Fay, Wickoff and Wu (2002 Nature 415:1024), referred to as
