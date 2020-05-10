@@ -13,6 +13,16 @@ the method are available from Galtier (2016). A similar approach and program hav
 Tataru et al. (2017). See Rousselle et al. (2018) for a comparison of the methods and clarification of
 their relationships.
 
+**multigrapes** is a program fitting a population genetic model to synonymous + non-synonymous Site
+Frequency Spectrum (SFS) data, and is essentially a multi-SFS version of the program grapes. This file is relevant to version 1.1.
+The main new feature of multi_grapes, compared to grapes, is the option of fitting model parameters
+assumed to be shared by distinct data sets – specifically, the shape of the distribution of fitness effects
+(DFE). This is the main focus of Galtier & Rousselle 2020, and the reason why this program was
+developed. In addition, new models of the DFE are implemented in multi_grapes that are absent in
+grapes.
+These new option come with costs: (1) several of the models implemented in grapes are not available in
+multi_grapes; (2) no estimate of the adaptive substitution rate is performed by multi_grapes.
+
 Installation
 ------------
 
@@ -23,8 +33,8 @@ Compilation
 
 If, for any reason, a source compilation is needed, here are the dependencies :
 * gcc >= 4.4
-* Bio++ >= 2.0 (bpp-core, bpp-phyl, bpp-seq)
 * libgsl >= 1.0
+* Bio++. The source code is ready for the latest development version of the libraries. Stable version >= 2.0 (bpp-core, bpp-phyl, bpp-seq) can be used with little modification of the code.
 
 Compilation can be achieved using **cmake**:
 ```bash
@@ -40,6 +50,8 @@ Execution
 
 ```bash
 grapes -in input_file.dofe -out output_file.csv -model model_name [options]
+
+multigrapes -in input_file.dofe -out output_file.csv -model model_name [options]
 ```
 
 Input
@@ -52,28 +64,40 @@ These are passed via a DoFE file as described in the documentation of the DoFE p
 indicated via an extra line in the input file containing: #unfolded . See examples at the bottom of this
 file.
 
+**multi_grapes** needs information on the number and frequency of synonymous and non-synonymous SNPs
+(SFS) and number of synonymous and non-synonymous sites, for one or several data sets. These are
+passed via a DoFE file as described in the documentation of the DoFE program:
+[http://www.lifesci.susx.ac.uk/home/Adam_Eyre-Walker/Website/Software.html][1].
+**multi_grapes** can handle both folded (as in DoFE) and unfolded SFS data. If SFS's are unfolded, this must
+be indicated via an extra line in the input file containing: #unfolded. Multiple data sets should appear as
+different lines of the DoFE file (see examples at the bottom of this file)
+
 Analysis
 --------
 **grapes** will estimate the distribution of fitness effect of mutations (DFE), rate of adaptive evolution
-(w a ), rate of non-adaptive evolution (w na ), and proportion of adaptive substitutions (a) by fitting a
+(<img src="https://render.githubusercontent.com/render/math?math=\omega_a">), rate of non-adaptive evolution (<img src="https://render.githubusercontent.com/render/math?math=\omega_{na}">), and proportion of adaptive substitutions (a) by fitting a
 population genetic model to SFS + divergence data in the maximum likelihood framework. grapes will
-also perform more basic analyses, namely estimating a as 1 – [(p N /p S )/(d N /d S )], referred to as Neutral
+also perform more basic analyses, namely estimating a as <img src="https://render.githubusercontent.com/render/math?math=1-\frac{p_N / p_S}{d_N / d_S}">, referred to as Neutral
 model, and using the corrected version of Fay, Wickoff and Wu (2002 Nature 415:1024), referred to as
 FWW.
+
+**multi_grapes** will estimate the distribution of fitness effect of mutations (DFE) by fitting a population
+genetic model to SFS + divergence data in the maximum likelihood framework. Data sets will first be
+analyzed separately (= with all parameters specific to each data set, as in grapes) then jointly (= with one parameter, the shape of the DFE, shared among data sets). 
 
 Output
 ------
 Basic output is written in the terminal. This corresponds to estimates of the adaptive and non-adaptive
 rates, main model parameters and likelihoods. Detailed output is written in a **csv** file.
 
-Options
--------
+Grapes options
+--------------
 
 The most important option is the name of the assumed DFE model. Five distinct models are
 implemented in addition to the Neutral model, namely `GammaZero` (=Gamma), `GammaExpo`, `DisplGamma`, `ScaledBeta`, and `FGMBesselK`.
 See Galtier (2016) for details on what these models mean. One can either use one of the six models (e.g., `-model GammaExpo`), or do the six in a single
 run by passing `-model all`. `GammaZero` with all default options is equivalent to the second approach
-of Eyre-Walker and Keightley (2009), with nuisance parameters $r_i$'s.
+of Eyre-Walker and Keightley (2009), with nuisance parameters <img src="https://render.githubusercontent.com/render/math?math=r_i">'s.
 
 ### Additional options:
 
@@ -91,6 +115,26 @@ local optima.
 optimize every parameter, but rather have some parameters fixed to predefined values; parameter
 names and predefined values are passed via a control file; see example at the bottom of this file
 (default=none).
+
+Multigrapes options
+-------------------
+
+The most important option is the name of the assumed DFE model. Two distinct models are implemented
+in addition to the Neutral model, namely `GammaZero` (=Gamma) and `ReflectedGamma`. See Galtier
+(2016) and Galtier & Rousselle (2020) for details on what these models mean. In addition, one can add a
+class of lethal mutations using the `-p_lethal` option (see below).
+
+### Additional options:
+
+* `-fold` : fold the SFS (if unfolded)
+* `-no_syn_orient_error` : force equal synonymous and non-synonymous mis-orientation rate (default=false)
+* `-nb_rand_start <int>` : number of random starting values in model optimization (default=0); setting
+positive values will slow down the program but decrease the probability of being trapped in local optima.
+* `-no_separate` : do not perform separate analysis.
+* `-no_shared` : do not perform shared analysis.
+* `-shared_shape <int>,<int>,...`: fixed shared shape parameters (all the listed values will be fitted
+successively); in the absence of this option, the shared shape parameter will be optimized.
+* `-p_lethal <float>` : proportion of lethal mutations (this parameter cannot be optimized).
 
 Developed by
 ------------
@@ -117,9 +161,11 @@ PLoS Genetics 12:e1005774.
 substitution rate in fluctuating populations. Biology Letters (in press)
 * Tataru P, Mollion M, Glémin S, Bataillon T. 2017 Inference of distribution of fitness effects and
 proportion of adaptive substitutions from polymorphism data. Genetics 207:1103–1119.
+* Galtier N., Rousselle M. 2020. How much does Ne vary among species? biorxiv
+[https://doi.org/10.1101/861849]
 
-Example input files:
---------------------
+Example input files for Grapes:
+-------------------------------
 
 ### folded DoFE file:
 
