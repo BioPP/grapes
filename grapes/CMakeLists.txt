@@ -3,7 +3,8 @@
 # Created: 30/05/2018
 
 add_executable(grapes Grapes.cpp)
-set (grapes-targets grapes)
+add_executable(multigrapes MultiGrapes.cpp)
+set (grapes-targets grapes multigrapes)
 
 foreach (target ${grapes-targets})
   # Link (static or shared)
