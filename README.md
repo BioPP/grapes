@@ -75,15 +75,15 @@ different lines of the DoFE file (see examples at the bottom of this file)
 Analysis
 --------
 **grapes** will estimate the distribution of fitness effect of mutations (DFE), rate of adaptive evolution
-(<img src="https://render.githubusercontent.com/render/math?math=\omega_a">), rate of non-adaptive evolution (w[na]), and proportion of adaptive substitutions (a) by fitting a
+(<img src="https://render.githubusercontent.com/render/math?math=\omega_a">), rate of non-adaptive evolution (<img src="https://render.githubusercontent.com/render/math?math=\omega_{na}">), and proportion of adaptive substitutions (a) by fitting a
 population genetic model to SFS + divergence data in the maximum likelihood framework. grapes will
-also perform more basic analyses, namely estimating a as 1 – [(p N /p S )/(d N /d S )], referred to as Neutral
+also perform more basic analyses, namely estimating a as <img src="https://render.githubusercontent.com/render/math?math=1-\frac{p_N / p_S}{d_N / d_S}">, referred to as Neutral
 model, and using the corrected version of Fay, Wickoff and Wu (2002 Nature 415:1024), referred to as
 FWW.
 
 **multi_grapes** will estimate the distribution of fitness effect of mutations (DFE) by fitting a population
 genetic model to SFS + divergence data in the maximum likelihood framework. Data sets will first be
-analyzed separately (=with all parameters specific to each data set, as in grapes) then jointly (=with one parameter, the shape of the DFE, shared among data sets). 
+analyzed separately (= with all parameters specific to each data set, as in grapes) then jointly (= with one parameter, the shape of the DFE, shared among data sets). 
 
 Output
 ------
@@ -97,7 +97,7 @@ The most important option is the name of the assumed DFE model. Five distinct mo
 implemented in addition to the Neutral model, namely `GammaZero` (=Gamma), `GammaExpo`, `DisplGamma`, `ScaledBeta`, and `FGMBesselK`.
 See Galtier (2016) for details on what these models mean. One can either use one of the six models (e.g., `-model GammaExpo`), or do the six in a single
 run by passing `-model all`. `GammaZero` with all default options is equivalent to the second approach
-of Eyre-Walker and Keightley (2009), with nuisance parameters $r_i$'s.
+of Eyre-Walker and Keightley (2009), with nuisance parameters <img src="https://render.githubusercontent.com/render/math?math=r_i">'s.
 
 ### Additional options:
 
