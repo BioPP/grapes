@@ -5,10 +5,8 @@
 #include <math.h>
 #include <time.h>
 
-#include <limits.h>
-#include <values.h>
+#include <limits>
 
-//#include <Bpp.all>
 #include <Bpp/Numeric/AbstractParametrizable.h>
 #include <Bpp/Numeric/Function/Functions.h>
 #include <Bpp/Numeric/Function/ReparametrizationFunctionWrapper.h>
@@ -19,9 +17,9 @@
 #include <Bpp/Phyl/Likelihood/PseudoNewtonOptimizer.h>
 
 
-#include <gsl_sf.h>
-#include <gsl_randist.h>
-#include <gsl_cdf.h>
+#include <gsl/gsl_sf.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 using namespace bpp;
 
@@ -1765,10 +1763,10 @@ class bpp_SFS_minus_lnl : public virtual Function, public AbstractParametrizable
     //constructor: store data d in private object and create parameters as required by model m
     bpp_SFS_minus_lnl(struct MK_data* d, struct model* m) : AbstractParametrizable(""), data(d){
 
-      for(unsigned int i=0;i<m->param_name.size();i++){
+      for(size_t i=0;i<m->param_name.size();i++){
         if(m->optimized[m->param_name[i]]==false) continue;
         double val, cd, cu;
-        IntervalConstraint* ic;
+        shared_ptr<IntervalConstraint> ic;
         if(m->reparametrization[i]=="log"){
           cd=log(m->constraint[i][0]); 
           cu=log(m->constraint[i][1]);
@@ -1778,7 +1776,7 @@ class bpp_SFS_minus_lnl : public virtual Function, public AbstractParametrizable
           cu=m->constraint[i][1];
         }
         val=(cd+cu)/2.;
-        ic=new IntervalConstraint(cd, cu, true, true, prec);
+        ic.reset(new IntervalConstraint(cd, cu, true, true, prec));
         addParameter_(new Parameter(m->param_name[i], val, ic));
       }
 
@@ -1990,9 +1988,9 @@ void optimize_DFEM(struct MK_data* data, struct model* m, struct parameter_point
   //optimization
 
   ParameterList pl, opt_pl;
-  double lnL, maxlnL=-DBL_MAX;
+  double lnL, maxlnL=-std::numeric_limits<double>::max();
 
-  for(unsigned int i=0;i< v_init_p.size();i++){
+  for(size_t i=0;i< v_init_p.size();i++){
 //cout <<"Starting values " <<i+1 <<" out of " <<v_init_p.size() <<endl;
       lnL=SFS_max_likelihood(lnL_fct, v_init_p[i], &pl);
 //cout <<endl <<"lnL:" <<lnL <<endl;
@@ -2001,7 +1999,7 @@ void optimize_DFEM(struct MK_data* data, struct model* m, struct parameter_point
 
 //cout <<"dd" <<endl;
 
-  if(maxlnL==-DBL_MAX) fin("Sorry: optimization failed; try more starting values\n");
+  if(maxlnL==-std::numeric_limits<double>::max()) fin("Sorry: optimization failed; try more starting values\n");
 
 
   //recover optimal values
@@ -3026,31 +3024,31 @@ class bpp_SFS_minus_lnl_shared : public virtual Function, public AbstractParamet
 
       if(shared_pp.negGshape>0.){
         double val, cd, cu;
-        IntervalConstraint* ic;
+        shared_ptr<IntervalConstraint> ic;
         cd=constraints["negGshape"][0]; 
         cu=constraints["negGshape"][1];
         val=(cd+cu)/2.;
-        ic=new IntervalConstraint(cd, cu, true, true, prec);
+        ic.reset(new IntervalConstraint(cd, cu, true, true, prec));
         addParameter_(new Parameter("negGshape", val, ic));
       }
 
       if(shared_pp.posGshape>0.){
         double val, cd, cu;
-        IntervalConstraint* ic;
+        shared_ptr<IntervalConstraint> ic;
         cd=constraints["posGshape"][0]; 
         cu=constraints["posGshape"][1];
         val=(cd+cu)/2.;
-        ic=new IntervalConstraint(cd, cu, true, true, prec);
+        ic.reset(new IntervalConstraint(cd, cu, true, true, prec));
         addParameter_(new Parameter("posGshape", val, ic));
       }
 
       if(shared_pp.pos_prop>0.){
         double val, cd, cu;
-        IntervalConstraint* ic;
+        shared_ptr<IntervalConstraint> ic;
         cd=constraints["pos_prop"][0]; 
         cu=constraints["pos_prop"][1];
         val=(cd+cu)/2.;
-        ic=new IntervalConstraint(cd, cu, true, true, prec);
+        ic.reset(new IntervalConstraint(cd, cu, true, true, prec));
         addParameter_(new Parameter("pos_prop", val, ic));
       }
 
