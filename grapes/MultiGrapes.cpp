@@ -1958,13 +1958,12 @@ public:
 public:
   // modify parameters; function matchParametersValue does call  fireParameterChanged
   void setParameters(const ParameterList& pl)
-  throw (ParameterNotFoundException, ConstraintException, Exception)
   {
     matchParametersValues(pl);
   }
 
   // returns current likelihood
-  double getValue() const throw (Exception) { return lnL; }
+  double getValue() const { return lnL; }
 
   // fireParameterChanged: called whenever a param is modified; calculates likelihood and store in lnL
   void fireParameterChanged(const ParameterList& pl)
@@ -3457,12 +3456,11 @@ public:
 
 public:
   void setParameters(const ParameterList& pl)
-  throw (ParameterNotFoundException, ConstraintException, Exception)
   {
     matchParametersValues(pl);
   }
 
-  double getValue() const throw (Exception) { return lnL; }
+  double getValue() const { return lnL; }
 
   void fireParameterChanged(const ParameterList& pl)
   {
