@@ -141,6 +141,7 @@ struct options
   double nearly_neutral_threshold;  // minimum Ne.s value defined as truly adaptive
   double FWW_threshold;             // threshold for low allele frequency removal in Fay et al (2001) alpha estimation
   struct fixed_parameters fixed_p;  // list of paraemeters that should be kept constant (not optimized) and their value
+  bool fold;
 };
 
 
@@ -1033,7 +1034,7 @@ vector<double> precalculate_expected_allele_counts(int j)
 
   global_j = j;
 
-  for (unsigned int i = 0; i < global_integral_S_point.size(); i++)
+  for (size_t i = 0; i < global_integral_S_point.size(); i++)
   {
     if (global_folded)
       v.push_back(onearg_S_folded_expected_allele_count(global_integral_S_point[i]));
@@ -2774,6 +2775,42 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
 }
 
 
+/* fold */
+/* Transform an unfolded sfs into a folded one (double*) */
+/* Unfolded sfs has size n (i.e., elements from 1 to n-1) */
+/* Folded version returned in the same array */
+/* Returns the size of folded SFS */
+
+int fold(double* sfs, int n)
+{
+  if (n % 2 == 1)
+  {
+    for (int i = 1; i <= n / 2; i++)
+    {
+      sfs[i] += sfs[n - i];
+    }
+    for (int i = n / 2 + 1; i < n; i++)
+    {
+      sfs[i] = -1.;
+    }
+  }
+  else
+  {
+    for (int i = 1; i < n / 2; i++)
+    {
+      sfs[i] += sfs[n - i];
+    }
+    for (int i = n / 2 + 1; i < n; i++)
+    {
+      sfs[i] = -1.;
+    }
+  }
+
+  return n / 2;
+}
+
+
+
 /* read_dofe */
 /* Reads dofe input file and return a data set structure */
 /* Two formats covered: 2006 (poly only) and 2009 (poly+ div) */
@@ -2882,6 +2919,7 @@ void usage()
   cout << "[-FWW_threshold float]       min allele freq in FWW alpha           default=0.15" << endl;
   // cout <<"[-multinomial]               multinomial likelihood calculation     default=Poisson" <<endl;
   cout << "[-no_div_param]              predict dN based on DFEM only          default=false" << endl;
+  cout << "[-fold]                           fold SFS                               default=false" << endl;
   cout << "[-no_syn_orient_error]       equal syn/non-syn misorientation       default=false" << endl;
   cout << "[-nb_rand_start int]         nb optimization random start values    default=0" << endl;
   cout << "[-fixed_param string]        fixed (non-optimized) param file name  default=none" << endl << endl;
@@ -2932,7 +2970,7 @@ void read_fixed_param_file(char* fname, struct options* opt)
 
 void set_default_options(struct options* opt)
 {
-  for (unsigned int i = 0; i < implemented_model_names.size(); i++)
+  for (size_t i = 0; i < implemented_model_names.size(); i++)
   {
     opt->do_model.push_back(false);
   }
@@ -2944,6 +2982,7 @@ void set_default_options(struct options* opt)
   opt->nearly_neutral_threshold = 5.;
   opt->FWW_threshold = 0.15;
   opt->fixed_p.nb = 0;
+  opt->fold = false;
 }
 
 
@@ -2986,6 +3025,9 @@ void  get_options(int argc, char** argv, struct options* opt, string* infile_nam
       sscanf(argv[i + 1], "%le", &(opt->FWW_threshold));
     if (argument == "-nb_rand_start" && i != argc - 1)
       sscanf(argv[i + 1], "%d", &(opt->nb_random_start));
+    if (argument == "-fold")
+      opt->fold = true;
+
 
     if (argument == "-fixed_param" && i != argc - 1)
     {
@@ -3009,7 +3051,7 @@ bool check_options(struct options* opt, string infile_name, string outfile_name)
     warn_message += "Warning: missing output file name - no file will be written\n";
 
   bool do_some_model = false;
-  for (unsigned int i = 0; i < implemented_model_names.size(); i++)
+  for (size_t i = 0; i < implemented_model_names.size(); i++)
   {
     if (opt->do_model[i])
     {
@@ -3045,7 +3087,54 @@ bool check_options(struct options* opt, string infile_name, string outfile_name)
 
 int main(int argc, char** argv)
 {
-  /* initializations */
+  double lp;
+
+  double x = 2;
+  x = x / 1968.69;
+
+  double m = 1.0003;
+  double nsz2 = 385;
+  double s = 0.54;
+  // double z=global_BKz;
+
+  double s2 = s * s;
+  // double z2=z*z;
+  double x2 = x * x;
+
+  lp = -log(2.) * (m + 1.) / 2.;
+  cout << "ok0:" << lp << endl;
+  lp -= x * nsz2 / 4.;
+  cout << "ok1:" << lp << endl;
+  lp += log(nsz2) / 2.;
+  cout << "ok2:" << lp << endl;
+  double A = (1. + 4 / (nsz2 * s2)) / x2;
+  cout << "A:" << A << endl;
+  lp += log(A) * (1. - m) / 4.;
+  cout << "ok3:" << lp << endl;
+  lp -= m * log(s);
+  cout << "ok4:" << lp << endl;
+  lsqrtpi = log(sqrt(PI));
+  lp -= lsqrtpi;
+  cout << "ok5:" << lp << endl;
+  lp -= log(gsl_sf_gamma(m / 2.));
+  cout << "ok6:" << lp << endl;
+  double B = 1. / (nsz2 * x2 * (nsz2 + 4. / s2));
+  cout << "B:" << B << endl;
+  double C = 1. / (4 * sqrt(B));
+  cout << "C:" << C << endl;
+  if (C > 50.)
+    return 0.;
+  lp += log(gsl_sf_bessel_Knu((m - 1.) / 2., C));
+  cout << "Bessel=" << gsl_sf_bessel_Knu((m - 1.) / 2., C) <<endl;
+  cout << "ok7:" << lp << endl;
+
+  cout << "Final:" << exp(lp) / 1968.69 << endl;
+
+      
+
+
+
+	/* initializations */
 
   time_t t1, t2;
   t1 = time(&t1);
@@ -3086,10 +3175,23 @@ int main(int argc, char** argv)
 
   cout << infile_name << ":" << endl;
   printf("%d data sets found, %d genes per data set, ", nb_loci, global_n);
+
+  if (!global_folded & opt.fold)
+  {
+    for (int k = 0; k < nb_loci; k++)
+    {
+      dataset[k].nb_SFScat = fold(dataset[k].specS, dataset[k].nb_gene);
+      fold(dataset[k].specN, dataset[k].nb_gene);
+      dataset[k].folded = true;
+    }
+    global_folded = true;
+  }
+
   if (global_folded)
     printf("folded SFS\n");
   else
     printf("unfolded SFS\n");
+
   if (global_folded)
     opt.use_syno_orientation_error = false;
 
