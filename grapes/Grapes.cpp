@@ -2650,10 +2650,10 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
   fprintf(out, "Neutral,%d,%.4f,%.4f,NA, NA,%.4f,NA,NA,NA,NA,NA,NA,%f,", nbparam_neut, neut_lnL, alpha_basic[0], alpha_basic[1], neut_neut);
   if (opt.use_syno_orientation_error)
     fprintf(out, "%.4f,", neut_oer);
-  for (unsigned int i = 0; i < implemented_model_names.size(); i++)
+  for (size_t i = 0; i < implemented_model_names.size(); i++)
   {
     string model_name = implemented_model_names[i];
-    for (unsigned int j = 0; j < mod[i].param_name.size(); j++)
+    for (size_t j = 0; j < mod[i].param_name.size(); j++)
     {
       fprintf(out, "NA,");
     }
@@ -3178,6 +3178,7 @@ int main(int argc, char** argv)
 
   if (!global_folded & opt.fold)
   {
+    printf("unfolded SFS will be folded\n");
     for (int k = 0; k < nb_loci; k++)
     {
       dataset[k].nb_SFScat = fold(dataset[k].specS, dataset[k].nb_gene);
@@ -3185,13 +3186,12 @@ int main(int argc, char** argv)
       dataset[k].folded = true;
     }
     global_folded = true;
+  } else {
+    if (global_folded)
+      printf("folded SFS\n");
+    else
+      printf("unfolded SFS\n");
   }
-
-  if (global_folded)
-    printf("folded SFS\n");
-  else
-    printf("unfolded SFS\n");
-
   if (global_folded)
     opt.use_syno_orientation_error = false;
 
