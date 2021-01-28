@@ -3102,34 +3102,19 @@ int main(int argc, char** argv)
   double x2 = x * x;
 
   lp = -log(2.) * (m + 1.) / 2.;
-  cout << "ok0:" << lp << endl;
   lp -= x * nsz2 / 4.;
-  cout << "ok1:" << lp << endl;
   lp += log(nsz2) / 2.;
-  cout << "ok2:" << lp << endl;
   double A = (1. + 4 / (nsz2 * s2)) / x2;
-  cout << "A:" << A << endl;
   lp += log(A) * (1. - m) / 4.;
-  cout << "ok3:" << lp << endl;
   lp -= m * log(s);
-  cout << "ok4:" << lp << endl;
   lsqrtpi = log(sqrt(PI));
   lp -= lsqrtpi;
-  cout << "ok5:" << lp << endl;
   lp -= log(gsl_sf_gamma(m / 2.));
-  cout << "ok6:" << lp << endl;
   double B = 1. / (nsz2 * x2 * (nsz2 + 4. / s2));
-  cout << "B:" << B << endl;
   double C = 1. / (4 * sqrt(B));
-  cout << "C:" << C << endl;
   if (C > 50.)
     return 0.;
   lp += log(gsl_sf_bessel_Knu((m - 1.) / 2., C));
-  cout << "Bessel=" << gsl_sf_bessel_Knu((m - 1.) / 2., C) <<endl;
-  cout << "ok7:" << lp << endl;
-
-  cout << "Final:" << exp(lp) / 1968.69 << endl;
-
       
 
 
