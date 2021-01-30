@@ -3171,6 +3171,7 @@ int main(int argc, char** argv)
       dataset[k].folded = true;
     }
     global_folded = true;
+    global_nbcat = dataset[0].nb_SFScat;
   } else {
     if (global_folded)
       printf("folded SFS\n");
