@@ -41,7 +41,8 @@ using namespace bpp;
 #define GAMMA_INTEGRAL_BREAK 0.5
 #define ARBITRARY_THETA 1.
 #define PI 3.14159265358979323846
-#define MIN_NB_EVAL 10
+//#define MIN_NB_EVAL 10
+#define MIN_NB_EVAL 2
 
 // constants used to parametrize the DFEM
 #define SCALED_BETA_BOUNDARY 25
@@ -49,11 +50,14 @@ using namespace bpp;
 
 
 // constants used to calculate likelihod surface and CI
-#define LNL_TOL 2   // tolerable number of log-likelihood units around the maximum (used to calculate CI around parameters)
-#define GSH_SURF_RANGE 0.5  // range for Gamma shape in Gamma likelihood surface calculation
-#define GSH_SURF_NB 50    // number of values for Gamma shape in Gamma likelihood surface calculation
-#define logGM_SURF_RANGE 0.5  // range for log Gamma mean in Gamma likelihood surface calculation
-#define logGM_SURF_NB 50  // number of values for log Gamma mean in Gamma likelihood surface calculation
+#define LNL_TOL 2               // tolerable number of log-likelihood units around the maximum (used to calculate CI around parameters)
+#define GSH_SURF_RANGE 0.5      // range for Gamma shape in Gamma likelihood surface calculation
+#define GSH_SURF_NB 50          // number of values for Gamma shape in Gamma likelihood surface calculation
+#define logGM_SURF_RANGE 0.5    // range for log Gamma mean in Gamma likelihood surface calculation
+#define logGM_SURF_NB 50        // number of values for log Gamma mean in Gamma likelihood surface calculation
+
+#define ARBITRARY_LENGTH 100000
+#define ARBITRARY_LAMBDA 1.
 
 int debug = 0;
 
@@ -63,14 +67,14 @@ struct onelocus_data
 // TreeTemplate<Node> t;
 // TreeTemplate<Node>* species_tree;
   char locus_name[MAXLNAME + 1];
-  int nb_gene;      // number of chromosomes sampled
+  int nb_gene;              // number of chromosomes sampled
   double Ls_poly, Ln_poly;  // number of S and NS sites for polymorphism data
-  double* specS, * specN;    // specS[j] <- number of synonymous SNP at observed frequency j in the sample (1<=j<=nb_SFScat)
-  int nb_SFScat;      // nb_gene/2 if folded; nb_gene-1 if unfolded
-  double Ls_div, Ln_div;  // number of S and NS sites for divergence data
-  double fixS, fixN;    // number of fixed S and N differences
+  double* specS, * specN;   // specS[j] <- number of synonymous SNP at observed frequency j in the sample (1<=j<=nb_SFScat)
+  int nb_SFScat;            // nb_gene/2 if folded; nb_gene-1 if unfolded
+  double Ls_div, Ln_div;    // number of S and NS sites for divergence data
+  double fixS, fixN;        // number of fixed S and N differences
   bool div_data_available;  // divergence data available
-  bool folded;      // folded/unfolded SFS data
+  bool folded;              // folded/unfolded SFS data
 };
 
 
@@ -100,23 +104,23 @@ struct parameter_point
   // current model
   string model_name;
   // DFEM
-  std::map<string, double> DFEM_param; // relevant DFEM parameters + orientation error
+  std::map<string, double> DFEM_param;     // relevant DFEM parameters + orientation error
   // demography, data biases
-  double theta;       // 4Ne.mu
-  vector<double> ri;      // Eyre-Walker et al's (2006) factors
+  double theta;                            // 4Ne.mu
+  vector<double> ri;                       // Eyre-Walker et al's (2006) factors
   // DFEM discretization
-  vector<double> discr_bound;   // discretization boundaries
-  vector<double> discr_mass;    // probability mass of intervals definedby discr_bound
+  vector<double> discr_bound;              // discretization boundaries
+  vector<double> discr_mass;               // probability mass of intervals definedby discr_bound
   // data-dependent variables
-  double lnL;       // log likelihood
+  double lnL;                              // log likelihood
   // struct SFS_div expected;              //expected SFS and divergence
-  double alpha;       // expected proportion of substitutions whose 4Ne.s > neut_thresh
-  double alpha_down, alpha_up;    // CI boundaries for alpha
-  double omegaA;      // alpha dN/dS
-  double omegaA_down, omegaA_up;  // CI boundaries for omegaA
-  double omegaNA;     // (1-alpha) dN/dS
-  double omegaNA_down, omegaNA_up;  // CI boundaries for omegaNA
-  vector<double> discr_DFE_fixed; // discrete distribution of fitness effects of non-syno subst
+  double alpha;                            // expected proportion of substitutions whose 4Ne.s > neut_thresh
+  double alpha_down, alpha_up;             // CI boundaries for alpha
+  double omegaA;                           // alpha dN/dS
+  double omegaA_down, omegaA_up;           // CI boundaries for omegaA
+  double omegaNA;                          // (1-alpha) dN/dS
+  double omegaNA_down, omegaNA_up;         // CI boundaries for omegaNA
+  vector<double> discr_DFE_fixed;          // discrete distribution of fitness effects of non-syno subst
 };
 
 
@@ -132,6 +136,7 @@ struct fixed_parameters
 struct options
 {
   vector<bool> do_model;            // which model(s) to do (same index as in implemented_model_names)
+  bool use_divergence_data;         // true: use divergence data if any; false: only use SFS data
   bool use_divergence_parameter;    // true: include an extra parameter controlling dN (classical EW-like approach)
                                     // false: predict dN as well as SFS from parametrized DFEM
   bool use_syno_orientation_error;  // true: allow some percentage of misorientation specific to synonymous SNPs (in addition to the ri's)
@@ -163,6 +168,8 @@ double positive_dN_corrective_term[(int)VERY_LARGE_S_VALUE + 1];
 double negative_dN_corrective_term[(int)LARGE_S_VALUE + 1];
 
 int nb_random_start_values;
+
+double ancient_to_recent_Ne_ratio = 1.;
 
 
 /* fin */
@@ -331,7 +338,7 @@ void set_constraints()
 #define K 5
 double c[K + 1], d[K + 1]; // global variables used by polint
 
-double trapzd(double (*func)(double), double a, double b, int n)
+double trapzd(double (* func)(double), double a, double b, int n)
 {
   double x, tnm, sum, del;
   static double s;
@@ -410,7 +417,7 @@ void my_polint(double xa[], double ya[], int n, double x, double* y, double* dy)
 
 /* Returns the one-dimension integral of f  from a to b */
 
-double qromb(double (*func)(double), double a, double b)
+double qromb(double (* func)(double), double a, double b)
 {
   double ss, dss;
   double s[JMAXP + 1], h[JMAXP + 1];
@@ -905,7 +912,7 @@ double onearg_negative_displaced_Gamma_density(double mx)
 
 /* onearg_scaled_Beta_density */
 /* Density of a centered, scaled Gamma distribution, with Bb, Ba, and med_prop passed as global variables */
-/* argument mx must be between -SCALED_BETA_BOUNDARY and +SCALED_BETA_BOUNDARY or zero is returned */
+/* argument x must be between -SCALED_BETA_BOUNDARY and +SCALED_BETA_BOUNDARY or zero is returned */
 
 double onearg_scaled_Beta_density(double x)
 {
@@ -1205,7 +1212,7 @@ double expected_divergence(double L, double lambda, double theta, map<string, do
 {
   global_L = L;
   global_lambda = lambda;
-  global_theta = theta;
+  global_theta = theta * ancient_to_recent_Ne_ratio;
   global_n = n;
 
   std::map<string, double>::iterator it;
@@ -1213,23 +1220,23 @@ double expected_divergence(double L, double lambda, double theta, map<string, do
   for (it = param.begin(); it != param.end(); it++)
   {
     if (it->first == "negGmean")
-      global_Gmean = it->second;
+      global_Gmean = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "negGshape")
       global_Gshape = it->second;
     else if (it->first == "posGmean")
-      global_posGmean = it->second;
+      global_posGmean = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "posGshape")
       global_posGshape = it->second;
     else if (it->first == "pos_prop")
       global_pos_prop = it->second;
     else if (it->first == "s0")
-      global_s0 = it->second;
+      global_s0 = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "Ba")
       global_Ba = it->second;
     else if (it->first == "Bb")
       global_Bb = it->second;
     else if (it->first == "med_prop")
-      global_med_prop = it->second;
+      global_med_prop = it->second / ancient_to_recent_Ne_ratio;
     else if (it->first == "BKnsz2")
       global_BKnsz2 = it->second;
     else if (it->first == "BKm")
@@ -1237,7 +1244,7 @@ double expected_divergence(double L, double lambda, double theta, map<string, do
     else if (it->first == "BKsigma")
       global_BKsigma = it->second;
     else if (it->first == "BKscale")
-      global_BKscale = it->second;
+      global_BKscale = it->second *= ancient_to_recent_Ne_ratio;
   }
 
   int k = global_integral_S_point.size();
@@ -1262,30 +1269,30 @@ double expected_divergence_truncated(double L, double lambda, double theta, map<
 {
   global_L = L;
   global_lambda = lambda;
-  global_theta = theta;
+  global_theta = theta * ancient_to_recent_Ne_ratio;
   global_n = n;
 
   std::map<string, double>::iterator it;
   for (it = param.begin(); it != param.end(); it++)
   {
     if (it->first == "negGmean")
-      global_Gmean = it->second;
+      global_Gmean = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "negGshape")
       global_Gshape = it->second;
     else if (it->first == "posGmean")
-      global_posGmean = it->second;
+      global_posGmean = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "posGshape")
       global_posGshape = it->second;
     else if (it->first == "pos_prop")
       global_pos_prop = it->second;
     else if (it->first == "s0")
-      global_s0 = it->second;
+      global_s0 = it->second * ancient_to_recent_Ne_ratio;
     else if (it->first == "Ba")
       global_Ba = it->second;
     else if (it->first == "Bb")
       global_Bb = it->second;
     else if (it->first == "med_prop")
-      global_med_prop = it->second;
+      global_med_prop = it->second / ancient_to_recent_Ne_ratio;
     else if (it->first == "BKnsz2")
       global_BKnsz2 = it->second;
     else if (it->first == "BKm")
@@ -1293,7 +1300,7 @@ double expected_divergence_truncated(double L, double lambda, double theta, map<
     else if (it->first == "BKsigma")
       global_BKsigma = it->second;
     else if (it->first == "BKscale")
-      global_BKscale = it->second;
+      global_BKscale = it->second * ancient_to_recent_Ne_ratio;
   }
 
   int k = global_integral_S_point.size();
@@ -1571,14 +1578,17 @@ double minus_SFS_loglikelihood(struct onelocus_data data, vector<double> exp_pS,
       k = (int)round(data.specN[j]);
       lnL += k * log(l) - log_facto[k] - l;
     }
-    l = exp_dS;
-    k = (int)round(data.fixS);
-    if (l != 0)
-      lnL += k * log(l) - log_facto[k] - l;
-    l = exp_dN;
-    k = (int)round(data.fixN);
-    if (l != 0)
-      lnL += k * log(l) - log_facto[k] - l;
+    if (data.div_data_available)
+    {
+      l = exp_dS;
+      k = (int)round(data.fixS);
+      if (l != 0)
+        lnL += k * log(l) - log_facto[k] - l;
+      l = exp_dN;
+      k = (int)round(data.fixN);
+      if (l != 0)
+        lnL += k * log(l) - log_facto[k] - l;
+    }
   }
   else    // calculate likelihood (multinomial)
   {
@@ -1589,7 +1599,8 @@ double minus_SFS_loglikelihood(struct onelocus_data data, vector<double> exp_pS,
       totobs += (int)round(data.specS[j]) + (int)round(data.specN[j]);
       totexp += exp_pS[j] + exp_pN[j];
     }
-    totobs += (int)round(data.fixS) + (int)round(data.fixN);
+    if (data.div_data_available)
+      totobs += (int)round(data.fixS) + (int)round(data.fixN);
     totexp += exp_dS + exp_dN;
     lnL = log_facto[totobs];
     for (int j = 1; j <= nc; j++)
@@ -1605,14 +1616,17 @@ double minus_SFS_loglikelihood(struct onelocus_data data, vector<double> exp_pS,
       k = (int)round(data.specN[j]);
       lnL += k * log(l) - log_facto[k];
     }
-    l = exp_dS / totexp;
-    k = (int)round(data.fixS);
-    if (l != 0)
-      lnL += k * log(l) - log_facto[k];
-    l = exp_dN / totexp;
-    k = (int)round(data.fixN);
-    if (l != 0)
-      lnL += k * log(l) - log_facto[k];
+    if (data.div_data_available)
+    {
+      l = exp_dS / totexp;
+      k = (int)round(data.fixS);
+      if (l != 0)
+        lnL += k * log(l) - log_facto[k];
+      l = exp_dN / totexp;
+      k = (int)round(data.fixN);
+      if (l != 0)
+        lnL += k * log(l) - log_facto[k];
+    }
   }
 
   return -lnL;
@@ -1631,17 +1645,6 @@ double optimize_saturated(struct onelocus_data* data)
 
   return minus_SFS_loglikelihood(*data, exp_specS, exp_specN, data->fixS, data->fixN);
 }
-
-
-/* neutral_expected_SFS_div */
-/*
-   struct SFS_div neutral_expected_SFS_div(struct onelocus_data data, map<string,double> param, double* the, vector<double>* rj){
-
-   struct SFS_div s;
-
-   return s;
-   }
- */
 
 
 /* optimize_neutral */
@@ -1681,6 +1684,7 @@ double optimize_neutral(struct onelocus_data* data, double* MLE_oer, double* MLE
 
   // expected divergence
   double exp_dS, exp_dN;
+
   if (opt.use_divergence_parameter)
   {
     exp_dN = data->fixN;
@@ -1694,6 +1698,7 @@ double optimize_neutral(struct onelocus_data* data, double* MLE_oer, double* MLE
     exp_dN *= coeff;
     exp_dS *= coeff;
   }
+
 
   // calculate likelihood, optimizing orientation locally if needed
   if (data->folded == true || !opt.use_syno_orientation_error)
@@ -1756,12 +1761,21 @@ struct SFS_div expected_SFS_div(struct onelocus_data data, map<string, double> p
   }
   // apply orientation error rate if required
   double oer;
-  if (data.folded == false && opt.use_syno_orientation_error) oer = param["syno_orientation_error"]; else oer = 0.;
-  for (int j = 1; j <= nc; j++)
+  if (data.folded == false && opt.use_syno_orientation_error)
   {
-    exp_specS[j] = prov_exp_specS[j] * (1. - oer) + prov_exp_specS[ng - j] * oer;
+    oer = param["syno_orientation_error"];
+    for (int j = 1; j <= nc; j++)
+    {
+      exp_specS[j] = prov_exp_specS[j] * (1. - oer) + prov_exp_specS[ng - j] * oer;
+    }
   }
-
+  else
+  {
+    for (int j = 1; j <= nc; j++)
+    {
+      exp_specS[j] = prov_exp_specS[j];
+    }
+  }
 
   // calculate selected SFS expectations assuming theta=1 and rj's=1
   for (int j = 1; j <= nc; j++)
@@ -1793,21 +1807,25 @@ struct SFS_div expected_SFS_div(struct onelocus_data data, map<string, double> p
   /* 2. divergence */
 
   double exp_divS, exp_divN;
+  if (data.div_data_available)
+  {
+    if (opt.use_divergence_parameter)
+    {
+      exp_divS = data.fixS;
+      exp_divN = data.fixN;
+    }
+    else
+    {
+      double prov_lambda = ((double)data.fixS / (double)data.Ls_div) - theta / ng;
+      exp_divS = prov_lambda * data.Ls_div;
+      exp_divN = expected_divergence(data.Ln_div, prov_lambda, theta, param, ng);
 
-  if (opt.use_divergence_parameter)
-  {
-    exp_divS = data.fixS;
-    exp_divN = data.fixN;
+      double coeff = (data.fixS + data.fixN) / (exp_divS + exp_divN);
+      exp_divS *= coeff;
+      exp_divN *= coeff;
+    }
   }
-  else
-  {
-    double prov_lambda = ((double)data.fixS / (double)data.Ls_div) - theta / ng;
-    exp_divS = prov_lambda * data.Ls_div;
-    exp_divN = expected_divergence(data.Ln_div, prov_lambda, theta, param, ng);
-    double coeff = (data.fixS + data.fixN) / (exp_divS + exp_divN);
-    exp_divS *= coeff;
-    exp_divN *= coeff;
-  }
+
 
   /* 3. fill SFS_div object and return */
 
@@ -1825,8 +1843,11 @@ struct SFS_div expected_SFS_div(struct onelocus_data data, map<string, double> p
     expected.specN.push_back(exp_specN[j]);
   }
 
-  expected.divS = exp_divS;
-  expected.divN = exp_divN;
+  if (data.div_data_available)
+  {
+    expected.divS = exp_divS;
+    expected.divN = exp_divN;
+  }
 
   return expected;
 }
@@ -2103,7 +2124,7 @@ void optimize_DFEM(struct onelocus_data* data, struct model* m, struct parameter
   ParameterList pl, opt_pl;
   double lnL, maxlnL = -std::numeric_limits<double>::max();
 
-  for (unsigned int i = 0; i < v_init_p.size(); i++)
+  for (size_t i = 0; i < v_init_p.size(); i++)
   {
     cout << "Starting values " << i + 1 << " out of " << v_init_p.size() << endl;
     lnL = SFS_max_likelihood(lnL_fct, v_init_p[i], &pl, prefix);
@@ -2332,6 +2353,13 @@ double DFEM_mass(double b1, double b2, struct parameter_point param)
 
 vector<double> calculate_alpha_basic(struct onelocus_data* data)
 {
+  vector<double> v;
+
+  if (data->div_data_available == false)
+  {
+    v.push_back(-1.); v.push_back(-1.); v.push_back(-1.); return v;
+  }
+
   double tot_poly_N = 0., tot_poly_S = 0.;
   for (int j = 1; j <= global_nbcat; j++)
   {
@@ -2343,8 +2371,8 @@ vector<double> calculate_alpha_basic(struct onelocus_data* data)
   double omegaA = (alpha * data->fixN * data->Ls_div) / (data->fixS * data->Ln_div);
   double omegaNA = ((1 - alpha) * data->fixN * data->Ls_div) / (data->fixS * data->Ln_div);
 
-  vector<double> v;
   v.push_back(alpha); v.push_back(omegaA); v.push_back(omegaNA);
+
   return v;
 }
 
@@ -2353,6 +2381,13 @@ vector<double> calculate_alpha_basic(struct onelocus_data* data)
 
 vector<double> calculate_alpha_fww(struct onelocus_data* data, double alfreq_thresh)
 {
+  vector<double> v;
+
+  if (data->div_data_available == false)
+  {
+    v.push_back(-1.); v.push_back(-1.); v.push_back(-1.); return v;
+  }
+
   double tot_poly_N = 0., tot_poly_S = 0.;
   for (int j = 1; j <= global_nbcat; j++)
   {
@@ -2365,8 +2400,8 @@ vector<double> calculate_alpha_fww(struct onelocus_data* data, double alfreq_thr
   double omegaA = (alpha * data->fixN * data->Ls_div) / (data->fixS * data->Ln_div);
   double omegaNA = ((1 - alpha) * data->fixN * data->Ls_div) / (data->fixS * data->Ln_div);
 
-  vector<double> v;
   v.push_back(alpha); v.push_back(omegaA);  v.push_back(omegaNA);
+
   return v;
 }
 
@@ -2444,7 +2479,13 @@ double calculate_alpha_DFEM(struct onelocus_data* data, struct parameter_point* 
   double totN;
   double opt_lambda;
 
-  if (opt.use_divergence_parameter)
+  if (data->div_data_available == false)
+  {
+    data->Ln_div = ARBITRARY_LENGTH;
+    opt_lambda = ARBITRARY_LAMBDA;
+    totN = expected_divergence(data->Ln_div, opt_lambda, optimal->theta, optimal->DFEM_param, data->nb_gene);
+  }
+  else if (opt.use_divergence_parameter)
   {
     totN = data->fixN;
     opt_lambda = ((double)data->fixS / (double)data->Ls_div) - optimal->theta / data->nb_gene;
@@ -2458,24 +2499,20 @@ double calculate_alpha_DFEM(struct onelocus_data* data, struct parameter_point* 
     totN = prov_totN * coeff;
   }
 
+
   double exp_div_N1 = expected_divergence_truncated(data->Ln_div, opt_lambda, optimal->theta, optimal->DFEM_param, data->nb_gene, -opt.nearly_neutral_threshold);
   double exp_div_N2 = expected_divergence_truncated(data->Ln_div, opt_lambda, optimal->theta, optimal->DFEM_param, data->nb_gene, 0);
   double exp_div_N3 = expected_divergence_truncated(data->Ln_div, opt_lambda, optimal->theta, optimal->DFEM_param, data->nb_gene, opt.nearly_neutral_threshold);
 
 
-  if (opt.use_divergence_parameter)
-    totN = data->fixN;
-  else
-    totN = expected_divergence(data->Ln_div, opt_lambda, optimal->theta, optimal->DFEM_param, data->nb_gene);
-
   double prop_fix_sdel = exp_div_N1 / totN;
   double prop_fix_wdel = (exp_div_N2 - exp_div_N1) / totN;
   double prop_fix_wadv = (exp_div_N3 - exp_div_N2) / totN;
-//  double prop_fix_sadv=(data->fixN-exp_div_N3)/totN;
   double prop_fix_sadv = (totN - exp_div_N3) / totN;
 
   optimal->alpha = prop_fix_sadv;
   optimal->omegaA = (prop_fix_sadv * totN * data->Ls_div) / (data->fixS * data->Ln_div);
+
   optimal->omegaNA = ((1. - prop_fix_sadv) * totN * data->Ls_div) / (data->fixS * data->Ln_div);
   optimal->discr_DFE_fixed.push_back(prop_fix_sdel);
   optimal->discr_DFE_fixed.push_back(prop_fix_wdel);
@@ -2543,7 +2580,7 @@ void console_output(vector<struct parameter_point> v_optimum, vector<struct mode
   cout << "  FWW[0.15]:\t" << alpha_FWW[0] << endl;
   for (size_t i = 0; i < v_optimum.size(); i++)
   {
-    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].alpha << " [" << v_optimum[i].alpha_down << "," << v_optimum[i].alpha_up << "]" << endl;
+    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].alpha /* <<" [" <<v_optimum[i].alpha_down <<"," <<v_optimum[i].alpha_up <<"]"*/ << endl;
   }
 
   // omegaA
@@ -2552,7 +2589,7 @@ void console_output(vector<struct parameter_point> v_optimum, vector<struct mode
   cout << "  FWW[0.15]:\t" << alpha_FWW[1] << endl;
   for (size_t i = 0; i < v_optimum.size(); i++)
   {
-    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].omegaA << " [" << v_optimum[i].omegaA_down << "," << v_optimum[i].omegaA_up << "]" << endl;
+    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].omegaA /* <<" [" <<v_optimum[i].omegaA_down <<"," <<v_optimum[i].omegaA_up <<"]"*/ << endl;
   }
 
   // omegaA
@@ -2561,7 +2598,7 @@ void console_output(vector<struct parameter_point> v_optimum, vector<struct mode
   cout << "  FWW[0.15]:\t" << alpha_FWW[2] << endl;
   for (size_t i = 0; i < v_optimum.size(); i++)
   {
-    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].omegaNA << " [" << v_optimum[i].omegaNA_down << "," << v_optimum[i].omegaNA_up << "]" << endl;
+    cout << "  " << v_optimum[i].model_name << ":\t" << v_optimum[i].omegaNA /* <<" [" <<v_optimum[i].omegaNA_down <<"," <<v_optimum[i].omegaNA_up <<"]" */ << endl;
   }
 }
 
@@ -2664,19 +2701,19 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
     fprintf(out, "NA,");
   }
 
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specS[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", neutral_expected.specS[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specN[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", neutral_expected.specN[j]);
   }
@@ -2714,19 +2751,19 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
       fprintf(out, "%f,", v_optimum[k].ri[j]);
     }
 
-    for (int j = 1; j < nbcat; j++)
+    for (int j = 1; j <= nbcat; j++)
     {
       fprintf(out, "%.4f,", observed.specS[j]);
     }
-    for (int j = 1; j < nbcat; j++)
+    for (int j = 1; j <= nbcat; j++)
     {
       fprintf(out, "%.4f,", expected.specS[j]);
     }
-    for (int j = 1; j < nbcat; j++)
+    for (int j = 1; j <= nbcat; j++)
     {
       fprintf(out, "%.4f,", observed.specN[j]);
     }
-    for (int j = 1; j < nbcat; j++)
+    for (int j = 1; j <= nbcat; j++)
     {
       fprintf(out, "%.4f,", expected.specN[j]);
     }
@@ -2755,19 +2792,19 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
     fprintf(out, "NA,");
   }
 
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specS[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specS[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specN[j]);
   }
-  for (int j = 1; j < nbcat; j++)
+  for (int j = 1; j <= nbcat; j++)
   {
     fprintf(out, "%.4f,", observed.specN[j]);
   }
@@ -2815,7 +2852,7 @@ int fold(double* sfs, int n)
 /* Reads dofe input file and return a data set structure */
 /* Two formats covered: 2006 (poly only) and 2009 (poly+ div) */
 
-struct onelocus_data* read_dofe(FILE* in, int* nb_loci)
+struct onelocus_data* read_dofe(FILE* in, int* nb_loci, bool use_div_data)
 {
   char line[MAXLLINE + 1], * tok;
   int ret, nbclass;
@@ -2880,7 +2917,7 @@ struct onelocus_data* read_dofe(FILE* in, int* nb_loci)
     }
     // check presence div data
     tok = strtok(NULL, "\t\n");
-    if (tok == NULL)
+    if (tok == NULL || !use_div_data)
     {
       dataset[nbl].Ln_div = dataset[nbl].Ls_div = dataset[nbl].fixN = dataset[nbl].fixS = -1.;
       dataset[nbl].div_data_available = false;
@@ -2915,14 +2952,16 @@ void usage()
   cout << endl << "usage: grapes -in input_file -out output_file -model model_name  [options] " << endl << endl;
 
   cout << "options:" << endl;
-  cout << "[-nearly_neutral float]      maximal \"nearly-neutral\" Ns            default=5." << endl;
-  cout << "[-FWW_threshold float]       min allele freq in FWW alpha           default=0.15" << endl;
-  // cout <<"[-multinomial]               multinomial likelihood calculation     default=Poisson" <<endl;
-  cout << "[-no_div_param]              predict dN based on DFEM only          default=false" << endl;
+  cout << "[-nearly_neutral float]           maximal \"nearly-neutral\" Ns            default=5." << endl;
+  cout << "[-FWW_threshold float]            min allele freq in FWW alpha           default=0.15" << endl;
+  // cout <<"[-multinomial]                   multinomial likelihood calculation     default=Poisson" <<endl;
+  cout << "[-no_div_data]                    don't use divergence data at all       default=false" << endl;
+  cout << "[-no_div_param]                   only use div. data to estimate DFE     default=false" << endl;
   cout << "[-fold]                           fold SFS                               default=false" << endl;
-  cout << "[-no_syn_orient_error]       equal syn/non-syn misorientation       default=false" << endl;
-  cout << "[-nb_rand_start int]         nb optimization random start values    default=0" << endl;
-  cout << "[-fixed_param string]        fixed (non-optimized) param file name  default=none" << endl << endl;
+  cout << "[-no_syn_orient_error]            equal syn/non-syn misorientation       default=false" << endl;
+  cout << "[-anc_to_rec_Ne_ratio float]      divergence/polymorphism Ne ratio       default=1." << endl;
+  cout << "[-nb_rand_start int]              nb optimization random start values    default=0" << endl;
+  cout << "[-fixed_param string]             fixed (non-optimized) param file name  default=none" << endl << endl;
 
   cout << "implemented models: GammaZero GammaExpo DisplGamma ScaledBeta FGMBesselK" << endl;
 
@@ -3013,6 +3052,8 @@ void  get_options(int argc, char** argv, struct options* opt, string* infile_nam
       }
     }
 
+    if (argument == "-no_div_data")
+      opt->use_divergence_data = false;
     if (argument == "-no_div_param")
       opt->use_divergence_parameter = false;
     if (argument == "-no_syn_orient_error")
@@ -3025,6 +3066,8 @@ void  get_options(int argc, char** argv, struct options* opt, string* infile_nam
       sscanf(argv[i + 1], "%le", &(opt->FWW_threshold));
     if (argument == "-nb_rand_start" && i != argc - 1)
       sscanf(argv[i + 1], "%d", &(opt->nb_random_start));
+    if (argument == "-anc_to_rec_Ne_ratio" && i != argc - 1)
+      sscanf(argv[i + 1], "%le", &ancient_to_recent_Ne_ratio);
     if (argument == "-fold")
       opt->fold = true;
 
@@ -3061,9 +3104,14 @@ bool check_options(struct options* opt, string infile_name, string outfile_name)
   if (do_some_model == false)
     warn_message += "Warning: no selected model - only neutral and saturated will be applied\n";
 
-
   if (opt->FWW_threshold < 0.)
     err_message += "Errror: negative FWW_threshold\n";
+
+  if (ancient_to_recent_Ne_ratio <= 0.)
+    err_message += "Errror: non-positive anc_to_rec_Ne_ratio\n";
+
+  if (opt->use_divergence_data == false)
+    opt->use_divergence_parameter = false;
 
   if (err_message.size() > 0)
   {
@@ -3087,39 +3135,42 @@ bool check_options(struct options* opt, string infile_name, string outfile_name)
 
 int main(int argc, char** argv)
 {
-  double lp;
+/*
+   //prov: test bessel density
 
-  double x = 2;
-  x = x / 1968.69;
+   global_BKm=10;
+   global_BKnsz2=100;
+   global_BKsigma=0.3;
+   global_BKscale=100;
 
-  double m = 1.0003;
-  double nsz2 = 385;
-  double s = 0.54;
-  // double z=global_BKz;
+   global_BKm=1.0003;
+   global_BKnsz2=385;
+   global_BKsigma=0.54;
+   global_BKscale=1968.69;
+   //global_BKscale=19687;
 
-  double s2 = s * s;
-  // double z2=z*z;
-  double x2 = x * x;
+   double int_m1000_m100=qromb(&onearg_BesselK_density, -1000, -100);
+   cout <<int_m1000_m100 <<endl;
+   double int_m100_m10=qromb(&onearg_BesselK_density, -100, -10);
+   cout <<int_m100_m10 <<endl;
+   double int_m10_m1=qromb(&onearg_BesselK_density, -10, -1);
+   cout <<int_m10_m1 <<endl;
+   double int_m1_1=qromb(&onearg_BesselK_density, -1, 1);
+   cout <<int_m1_1 <<endl;
+   double int_1_10=qromb(&onearg_BesselK_density, 1, 10);
+   cout <<int_1_10 <<endl;
+   double int_10_100=qromb(&onearg_BesselK_density, 10, 100);
+   cout <<int_10_100 <<endl;
+   double sint=int_m1000_m100+int_m100_m10+int_m10_m1+int_m1_1+int_1_10+int_10_100;
+   cout <<"sum:" << sint <<endl;
+   double big_int=qromb(&onearg_BesselK_density, -10000, 1000);
+   cout <<big_int <<endl;
 
-  lp = -log(2.) * (m + 1.) / 2.;
-  lp -= x * nsz2 / 4.;
-  lp += log(nsz2) / 2.;
-  double A = (1. + 4 / (nsz2 * s2)) / x2;
-  lp += log(A) * (1. - m) / 4.;
-  lp -= m * log(s);
-  lsqrtpi = log(sqrt(PI));
-  lp -= lsqrtpi;
-  lp -= log(gsl_sf_gamma(m / 2.));
-  double B = 1. / (nsz2 * x2 * (nsz2 + 4. / s2));
-  double C = 1. / (4 * sqrt(B));
-  if (C > 50.)
-    return 0.;
-  lp += log(gsl_sf_bessel_Knu((m - 1.) / 2., C));
-      
+   exit(1);
+ */
 
 
-
-	/* initializations */
+  /* initializations */
 
   time_t t1, t2;
   t1 = time(&t1);
@@ -3147,7 +3198,7 @@ int main(int argc, char** argv)
     printf("Can't read file: %s\n", infile_name.c_str()); exit(0);
   }
   int nb_loci = 0;
-  struct onelocus_data* dataset = read_dofe(input, &nb_loci);
+  struct onelocus_data* dataset = read_dofe(input, &nb_loci, opt.use_divergence_data);
   if (dataset == NULL)
   {
     printf("Bad input file: %s\n", infile_name.c_str()); exit(0);
@@ -3193,7 +3244,8 @@ int main(int argc, char** argv)
   {
     tot += (int)round(dataset->specN[j]) + (int)round(dataset->specS[j]);
   }
-  tot += (int)round(dataset->fixN) + (int)round(dataset->fixS);
+  if (dataset[0].div_data_available)
+    tot += (int)round(dataset->fixN) + (int)round(dataset->fixS);
 
   log_facto = (double*)calloc(tot + 3, sizeof(double));
   precalculate_log_facto(tot + 2);
@@ -3239,7 +3291,7 @@ int main(int argc, char** argv)
   // other
   // create model list
   vector<struct model> model_list;
-  for (unsigned int i = 0; i < implemented_model_names.size(); i++)
+  for (size_t i = 0; i < implemented_model_names.size(); i++)
   {
     if (opt.do_model[i])
       model_list.push_back(create_model(implemented_model_names[i]));
@@ -3249,7 +3301,7 @@ int main(int argc, char** argv)
 
   // optimize likelihood
   vector<struct parameter_point> v_optimal;
-  for (unsigned int i = 0; i < model_list.size(); i++)
+  for (size_t i = 0; i < model_list.size(); i++)
   {
     current_model = model_list[i];
     current_DFEM_fit = model_list[i].name;
@@ -3263,11 +3315,11 @@ int main(int argc, char** argv)
 
   /* DFEM discretization */
 
-  for (unsigned int i = 0; i < v_optimal.size(); i++)
+  for (size_t i = 0; i < v_optimal.size(); i++)
   {
-    double nb_bound = v_optimal[i].discr_bound.size();
+    size_t nb_bound = v_optimal[i].discr_bound.size();
     v_optimal[i].discr_mass.push_back(DFEM_mass(v_optimal[i].discr_bound[0] + 1., v_optimal[i].discr_bound[0], v_optimal[i]));
-    for (unsigned int j = 1; j < nb_bound; j++)
+    for (size_t j = 1; j < nb_bound; j++)
     {
       v_optimal[i].discr_mass.push_back(DFEM_mass(v_optimal[i].discr_bound[j - 1], v_optimal[i].discr_bound[j], v_optimal[i]));
     }
@@ -3277,7 +3329,7 @@ int main(int argc, char** argv)
 
   /* alpha */
 
-  cout << "Calculating alpha (confidence interval)..." << endl;
+  cout << "Calculating alpha/omegaA/omegaNA..." << endl;
   // basic
   vector<double> alpha_basic = calculate_alpha_basic(&(dataset[0]));
 
@@ -3285,12 +3337,12 @@ int main(int argc, char** argv)
   vector<double> alpha_FWW = calculate_alpha_fww(&(dataset[0]), opt.FWW_threshold);
 
   // DFEM-corrected
-  for (unsigned int i = 0; i < v_optimal.size(); i++)
+  for (size_t i = 0; i < v_optimal.size(); i++)
   {
     current_DFEM_fit = model_list[i].name;
     current_model = model_list[i];
     calculate_alpha_DFEM(&(dataset[0]), &(v_optimal[i]));
-    calculate_alpha_CI(&(dataset[0]), &(v_optimal[i]), 1.96);
+    // calculate_alpha_CI(&(dataset[0]), &(v_optimal[i]), 1.96);
   }
 
 
