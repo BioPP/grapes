@@ -3014,6 +3014,7 @@ void set_default_options(struct options* opt)
     opt->do_model.push_back(false);
   }
 
+  opt->use_divergence_data = true;
   opt->use_divergence_parameter = true;
   opt->use_syno_orientation_error = true;
   opt->use_poisson = true;
@@ -3229,6 +3230,10 @@ int main(int argc, char** argv)
     else
       printf("unfolded SFS\n");
   }
+  if (dataset[0].div_data_available == false)
+    printf(", no divergence data");
+  printf("\n");
+
   if (global_folded)
     opt.use_syno_orientation_error = false;
 
