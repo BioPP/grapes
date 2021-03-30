@@ -1806,7 +1806,7 @@ struct SFS_div expected_SFS_div(struct onelocus_data data, map<string, double> p
 
   /* 2. divergence */
 
-  double exp_divS, exp_divN;
+  double exp_divS = -1, exp_divN = -1;
   if (data.div_data_available)
   {
     if (opt.use_divergence_parameter)
@@ -1816,7 +1816,7 @@ struct SFS_div expected_SFS_div(struct onelocus_data data, map<string, double> p
     }
     else
     {
-      double prov_lambda = ((double)data.fixS / (double)data.Ls_div) - theta / ng;
+      double prov_lambda = (static_cast<double>(data.fixS) / static_cast<double>(data.Ls_div)) - theta / ng;
       exp_divS = prov_lambda * data.Ls_div;
       exp_divN = expected_divergence(data.Ln_div, prov_lambda, theta, param, ng);
 
@@ -2355,9 +2355,12 @@ vector<double> calculate_alpha_basic(struct onelocus_data* data)
 {
   vector<double> v;
 
-  if (data->div_data_available == false)
+  if (!data->div_data_available)
   {
-    v.push_back(-1.); v.push_back(-1.); v.push_back(-1.); return v;
+    v.push_back(-1.);
+    v.push_back(-1.);
+    v.push_back(-1.);
+    return v;
   }
 
   double tot_poly_N = 0., tot_poly_S = 0.;
@@ -2383,9 +2386,12 @@ vector<double> calculate_alpha_fww(struct onelocus_data* data, double alfreq_thr
 {
   vector<double> v;
 
-  if (data->div_data_available == false)
+  if (!data->div_data_available)
   {
-    v.push_back(-1.); v.push_back(-1.); v.push_back(-1.); return v;
+    v.push_back(-1.);
+    v.push_back(-1.);
+    v.push_back(-1.);
+    return v;
   }
 
   double tot_poly_N = 0., tot_poly_S = 0.;
@@ -2479,7 +2485,7 @@ double calculate_alpha_DFEM(struct onelocus_data* data, struct parameter_point* 
   double totN;
   double opt_lambda;
 
-  if (data->div_data_available == false)
+  if (!data->div_data_available)
   {
     data->Ln_div = ARBITRARY_LENGTH;
     opt_lambda = ARBITRARY_LAMBDA;
@@ -3215,7 +3221,7 @@ int main(int argc, char** argv)
 
   if (!global_folded & opt.fold)
   {
-    printf("unfolded SFS will be folded\n");
+    printf("unfolded SFS will be folded");
     for (int k = 0; k < nb_loci; k++)
     {
       dataset[k].nb_SFScat = fold(dataset[k].specS, dataset[k].nb_gene);
@@ -3226,11 +3232,11 @@ int main(int argc, char** argv)
     global_nbcat = dataset[0].nb_SFScat;
   } else {
     if (global_folded)
-      printf("folded SFS\n");
+      printf("folded SFS");
     else
-      printf("unfolded SFS\n");
+      printf("unfolded SFS");
   }
-  if (dataset[0].div_data_available == false)
+  if (!dataset[0].div_data_available)
     printf(", no divergence data");
   printf("\n");
 
