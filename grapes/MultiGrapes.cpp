@@ -13,7 +13,7 @@
 #include <Bpp/Numeric/Function/OptimizationStopCondition.h>
 #include <Bpp/Numeric/AutoParameter.h>
 
-#include <Bpp/Phyl/Likelihood/PseudoNewtonOptimizer.h>
+#include <Bpp/Phyl/PseudoNewtonOptimizer.h>
 
 
 #include <gsl/gsl_sf.h>

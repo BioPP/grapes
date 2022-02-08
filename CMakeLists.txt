@@ -3,7 +3,7 @@
 # Created: 30/05/2018
 
 # Global parameters
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.0.0)
 project(grapes CXX)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -64,7 +64,7 @@ if (CMAKE_INSTALL_PREFIX)
 endif (CMAKE_INSTALL_PREFIX)
 
 include (GNUInstallDirs)
-find_package (bpp-phyl 12.0.0 REQUIRED)
+find_package (bpp-phyl3 1.0.0 REQUIRED)
 
 # Find GSL libraries
 find_package( GSL )
