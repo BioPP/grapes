@@ -3,7 +3,7 @@
 # Created: 30/05/2018
 
 # Global parameters
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.5.0)
 project(grapes CXX)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -12,7 +12,7 @@ if (NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -O2 -g3 -fmessage-length=0 -Wall")
+add_compile_options(-std=c++14 -O2 -g3 -fmessage-length=0 -Wall)
 
 
 

@@ -1920,7 +1920,7 @@ double minus_loglikelihood(struct MK_data data, map<string, double> param, doubl
 /* bpp_SFS_minus_lnl */
 /* bio++ likelihood function */
 
-class bpp_SFS_minus_lnl : public virtual Function,
+class bpp_SFS_minus_lnl : public virtual FunctionInterface,
   public AbstractParametrizable
 {
 private:
@@ -1988,9 +1988,9 @@ public:
 /* Likelihood optimizing function: creates bio++ likelihood function, bio++ reparametrizer and bio++ optimizer, */
 /* initializes parameters, launches optimization, returns optimal values (through pl) */
 
-double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init, ParameterList* pl)
+double SFS_max_likelihood(shared_ptr<bpp_SFS_minus_lnl> lnL_fct, map<string, double> p_init, ParameterList* pl)
 {
-  ParameterList init = lnL_fct.getParameters();
+  ParameterList init = lnL_fct->getParameters();
 
   vector<string> plnames = current_model.param_name;
   for (size_t i = 0; i < plnames.size(); i++)
@@ -2005,27 +2005,25 @@ double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init,
     init.setParameterValue(plnames[i], in);
   }
 
-  lnL_fct.setParameters(init);
-  ReparametrizationFunctionWrapper rpf(&lnL_fct, false);
-  ThreePointsNumericalDerivative tpnd(&rpf);
-  tpnd.setParametersToDerivate(rpf.getParameters().getParameterNames());
-  AbstractOptimizer* optim = 0;
-  // optim = new BfgsMultiDimensions(&tpnd);
-  optim = new PseudoNewtonOptimizer(&tpnd);
+  lnL_fct->setParameters(init);
+  auto rpf = make_shared<ReparametrizationFunctionWrapper>(lnL_fct, false);
+  auto tpnd = make_shared<ThreePointsNumericalDerivative>(rpf);
+  tpnd->setParametersToDerivate(rpf->getParameters().getParameterNames());
+  auto optim = make_unique<PseudoNewtonOptimizer>(tpnd);
   optim->setVerbose(0);
   optim->setProfiler(0);
   optim->setMessageHandler(0);
   optim->setConstraintPolicy(AutoParameter::CONSTRAINTS_AUTO);
 
-  FunctionStopCondition mystop(optim);
-  mystop.setTolerance(OPTIM_TOLERANCE);
+  auto mystop = make_shared<FunctionStopCondition>(optim.get());
+  mystop->setTolerance(OPTIM_TOLERANCE);
   optim->setStopCondition(mystop);
 
   optim->setMaximumNumberOfEvaluations(OPTIM_MAX_EVAL);
 
   double ml = 0;
 
-  ParameterList init_transformed = rpf.getParameters();
+  ParameterList init_transformed = rpf->getParameters();
   try
   {
     optim->init(init_transformed);
@@ -2036,11 +2034,9 @@ double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init,
     cout << "ERROR! " << e.what() << endl; return 1.;
   }
 
-  *pl = lnL_fct.getParameters();
+  *pl = lnL_fct->getParameters();
   if (optim->getNumberOfEvaluations() < OPTIM_MIN_EVAL)
     ml = -1.;
-
-  delete optim;
 
   return -ml;
 }
@@ -2167,7 +2163,7 @@ void optimize_DFEM(struct MK_data* data, struct model* m, struct parameter_point
 {
 // cout <<"aa" <<endl;
 
-  bpp_SFS_minus_lnl lnL_fct(data, m);
+  auto lnL_fct = make_shared<bpp_SFS_minus_lnl>(data, m);
 
 // cout <<"bb" <<endl;
 
@@ -2968,7 +2964,7 @@ struct MK_data* read_dofe(FILE* in, int* nb_dataset, bool use_div_data)
     if (line[0] == '\n') continue;
     if (line[0] == '#') continue;
     // read locus name
-    sprintf(dataset[nbl].name, "%s", strtok(line, "\t\n"));
+    snprintf(dataset[nbl].name, 1000, "%s", strtok(line, "\t\n"));
     dataset[nbl].folded = folded;
     // read nb genes, deduce nb categories
     ret = sscanf(strtok(NULL, "\t\n"), "%d", &(dataset[nbl].nb_gene));
@@ -3400,7 +3396,7 @@ vector<struct parameter_point> multi_max_likelihood(struct MK_data* dataset, int
 /* bpp_SFS_minus_lnl_shared */
 /* bio++ likelihood function, multiple species, shared_parameters */
 
-class bpp_SFS_minus_lnl_shared : public virtual Function,
+class bpp_SFS_minus_lnl_shared : public virtual FunctionInterface,
   public AbstractParametrizable
 {
 private:
@@ -3481,12 +3477,12 @@ public:
 
 vector< struct parameter_point > optimize_DFEM_shared(struct MK_data* data, int nb_dataset, struct shared_parameter_point* shared_pp, double* multi_ml)
 {
-  vector< struct parameter_point > v_opt;
-  bpp_SFS_minus_lnl_shared lnL_fct(data, nb_dataset, *shared_pp);
+  vector< struct parameter_point> v_opt;
+  auto lnL_fct = make_shared<bpp_SFS_minus_lnl_shared>(data, nb_dataset, *shared_pp);
 
   // starting points
 
-  ParameterList init = lnL_fct.getParameters();
+  ParameterList init = lnL_fct->getParameters();
   if (init.hasParameter("negGshape"))
     init.setParameterValue("negGshape", shared_pp->negGshape);
   if (init.hasParameter("posGshape"))
@@ -3494,31 +3490,30 @@ vector< struct parameter_point > optimize_DFEM_shared(struct MK_data* data, int 
   if (init.hasParameter("pos_prop"))
     init.setParameterValue("pos_prop", shared_pp->pos_prop);
 
-  lnL_fct.setParameters(init);
+  lnL_fct->setParameters(init);
 
   // create relevant objects
 
-  ReparametrizationFunctionWrapper rpf(&lnL_fct, false);
+  auto rpf = make_shared<ReparametrizationFunctionWrapper>(lnL_fct, false);
 
-  ThreePointsNumericalDerivative tpnd(&rpf);
-  tpnd.setParametersToDerivate(rpf.getParameters().getParameterNames());
+  auto tpnd = make_shared<ThreePointsNumericalDerivative>(rpf);
+  tpnd->setParametersToDerivate(rpf->getParameters().getParameterNames());
 
-  AbstractOptimizer* optim = 0;
-  optim = new PseudoNewtonOptimizer(&tpnd);
+  auto optim = make_unique<PseudoNewtonOptimizer>(tpnd);
 
   optim->setVerbose(1);
   optim->setProfiler(0);
   optim->setMessageHandler(0);
   optim->setConstraintPolicy(AutoParameter::CONSTRAINTS_AUTO);
 
-  FunctionStopCondition mystop(optim);
-  mystop.setTolerance(OPTIM_TOLERANCE);
+  auto mystop = make_shared<FunctionStopCondition>(optim.get());
+  mystop->setTolerance(OPTIM_TOLERANCE);
   optim->setStopCondition(mystop);
   optim->setMaximumNumberOfEvaluations(OPTIM_MAX_EVAL);
 
   // optimize
 
-  ParameterList init_transformed = rpf.getParameters();
+  ParameterList init_transformed = rpf->getParameters();
   optim->init(init_transformed);
   optim->optimize();
 
@@ -3527,7 +3522,7 @@ vector< struct parameter_point > optimize_DFEM_shared(struct MK_data* data, int 
   {
     *multi_ml = -1.; return v_opt;
   }
-  ParameterList finit = lnL_fct.getParameters();
+  ParameterList finit = lnL_fct->getParameters();
   if (finit.hasParameter("negGshape"))
     shared_pp->negGshape = finit.getParameterValue("negGshape");
   if (finit.hasParameter("posGshape"))
@@ -3536,8 +3531,6 @@ vector< struct parameter_point > optimize_DFEM_shared(struct MK_data* data, int 
     shared_pp->pos_prop = finit.getParameterValue("pos_prop");
 
   v_opt = multi_max_likelihood(data, nb_dataset, *shared_pp, multi_ml);
-
-  delete optim;
 
   return v_opt;
 }

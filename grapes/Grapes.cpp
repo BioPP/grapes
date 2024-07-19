@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include <limits>
+#include <memory>
 
 #include <Bpp/App/ApplicationTools.h>
 #include <Bpp/Text/StringTokenizer.h>
@@ -1869,7 +1870,7 @@ double minus_loglikelihood(struct onelocus_data data, map<string, double> param,
 /* bpp_SFS_minus_lnl */
 /* bio++ likelihood function */
 
-class bpp_SFS_minus_lnl : public virtual Function,
+class bpp_SFS_minus_lnl : public virtual FunctionInterface,
   public AbstractParametrizable
 {
 private:
@@ -1936,9 +1937,9 @@ public:
 /* Likelihood optimizing function: creates bio++ likelihood function, bio++ reparametrizer and bio++ optimizer, */
 /* initializes parameters, launches optimization, returns optimal values (through pl) */
 
-double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init, ParameterList* pl, const string& prefix = "")
+double SFS_max_likelihood(shared_ptr<bpp_SFS_minus_lnl> lnL_fct, map<string, double> p_init, ParameterList* pl, const string& prefix = "")
 {
-  ParameterList init = lnL_fct.getParameters();
+  ParameterList init = lnL_fct->getParameters();
 
   vector<string> plnames = current_model.param_name;
   for (unsigned int i = 0; i < plnames.size(); i++)
@@ -1954,29 +1955,27 @@ double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init,
   }
 
 
-  lnL_fct.setParameters(init);
+  lnL_fct->setParameters(init);
 
-  ReparametrizationFunctionWrapper rpf(&lnL_fct, false);
+  auto rpf = make_shared<ReparametrizationFunctionWrapper>(lnL_fct, false);
 
-  ThreePointsNumericalDerivative tpnd(&rpf);
-  tpnd.setParametersToDerivate(rpf.getParameters().getParameterNames());
+  auto tpnd = make_shared<ThreePointsNumericalDerivative>(rpf);
+  tpnd->setParametersToDerivate(rpf->getParameters().getParameterNames());
 
-  AbstractOptimizer* optim = 0;
-  // optim = new BfgsMultiDimensions(&tpnd);
-  optim = new PseudoNewtonOptimizer(&tpnd);
+  auto optim = std::make_unique<PseudoNewtonOptimizer>(tpnd);
 
   string mhPath = prefix + ".messages";
-  OutputStream* messageHandler =
-    (mhPath == "none") ? 0 :
-    (mhPath == "std") ? ApplicationTools::message.get() :
-    new StlOutputStream(new ofstream(mhPath.c_str(), ios::out));
+  auto messageHandler =
+    (mhPath == "none") ? nullptr :
+    (mhPath == "std") ? ApplicationTools::message :
+    make_shared<StlOutputStream>(make_unique<ofstream>(mhPath.c_str(), ios::out));
   ApplicationTools::displayResult("Message handler", mhPath);
 
   string prPath = prefix + ".profile";
-  OutputStream* profiler =
-    (prPath == "none") ? 0 :
-    (prPath == "std") ? ApplicationTools::message.get() :
-    new StlOutputStream(new ofstream(prPath.c_str(), ios::out));
+  auto profiler =
+    (prPath == "none") ? nullptr :
+    (prPath == "std") ? ApplicationTools::message :
+    make_shared<StlOutputStream>(make_unique<ofstream>(prPath.c_str(), ios::out));
   if (profiler)
     profiler->setPrecision(20);
   ApplicationTools::displayResult("Profiler", prPath);
@@ -1986,15 +1985,15 @@ double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init,
   optim->setMessageHandler(messageHandler);
   optim->setConstraintPolicy(AutoParameter::CONSTRAINTS_AUTO);
 
-  FunctionStopCondition mystop(optim);
-  mystop.setTolerance(OPTIM_TOLERANCE);
+  auto mystop = make_shared<FunctionStopCondition>(optim.get());
+  mystop->setTolerance(OPTIM_TOLERANCE);
   optim->setStopCondition(mystop);
 
   optim->setMaximumNumberOfEvaluations(OPTIM_MAX_EVAL);
 
   double ml = 0;
 
-  ParameterList init_transformed = rpf.getParameters();
+  ParameterList init_transformed = rpf->getParameters();
 
   try
   {
@@ -2006,11 +2005,9 @@ double SFS_max_likelihood(bpp_SFS_minus_lnl lnL_fct, map<string, double> p_init,
     cout << "ERROR! " << e.what() << endl; return 1.;
   }
 
-  *pl = lnL_fct.getParameters();
+  *pl = lnL_fct->getParameters();
   if (optim->getNumberOfEvaluations() < MIN_NB_EVAL)
     ml = -1.;
-
-  delete optim;
 
   return -ml;
 }
@@ -2110,7 +2107,7 @@ vector< map<string, double> > set_initial_values(struct model* m)
 
 void optimize_DFEM(struct onelocus_data* data, struct model* m, struct parameter_point* optimum, const string& prefix)
 {
-  bpp_SFS_minus_lnl lnL_fct(data, m);
+  auto lnL_fct = make_shared<bpp_SFS_minus_lnl>(data, m);
 
 
   // starting points
@@ -2891,7 +2888,7 @@ struct onelocus_data* read_dofe(FILE* in, int* nb_loci, bool use_div_data)
     if (line[0] == '\n') continue;
     if (line[0] == '#') continue;
     // read locus name
-    sprintf(dataset[nbl].locus_name, "%s", strtok(line, "\t\n"));
+    snprintf(dataset[nbl].locus_name, 1000, "%s", strtok(line, "\t\n"));
     dataset[nbl].folded = folded;
     // read nb genes, deduce nb categories
     ret = sscanf(strtok(NULL, "\t\n"), "%d", &(dataset[nbl].nb_gene));
