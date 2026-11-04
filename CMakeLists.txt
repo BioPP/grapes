@@ -3,8 +3,17 @@
 # Created: 30/05/2018
 
 # Global parameters
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 project(grapes CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Compile options
+add_compile_options(-O2 -g3 -fmessage-length=0 -Wall)
 
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
@@ -12,7 +21,6 @@ if (NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif()
 
-add_compile_options(-std=c++14 -O2 -g3 -fmessage-length=0 -Wall)
 
 
 
@@ -64,7 +72,7 @@ if (CMAKE_INSTALL_PREFIX)
 endif (CMAKE_INSTALL_PREFIX)
 
 include (GNUInstallDirs)
-find_package (bpp-phyl3 1.0.0 REQUIRED)
+find_package (bpp-phyl 13.0.0 REQUIRED)
 
 # Find GSL libraries
 find_package( GSL )
