@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <Bpp/App/ApplicationTools.h>
+#include <Bpp/App/BppApplication.h>
 #include <Bpp/Text/StringTokenizer.h>
 #include <Bpp/Numeric/VectorTools.h>
 #include <Bpp/Numeric/AbstractParametrizable.h>
@@ -151,7 +152,7 @@ struct options
 };
 
 
-/* global variales used throughut */
+/* global variables used throughut */
 
 vector<string> implemented_model_names;
 struct options opt;
@@ -3031,7 +3032,7 @@ void set_default_options(struct options* opt)
 
 /* get_options */
 
-void  get_options(int argc, char** argv, struct options* opt, string* infile_name, string* outfile_name)
+void get_options(int argc, char** argv, struct options* opt, string* infile_name, string* outfile_name)
 {
   string argument, argument1;
 
@@ -3173,11 +3174,11 @@ int main(int argc, char** argv)
    exit(1);
  */
 
+  BppApplication grapes(argc, argv, "Grapes");
+  grapes.startTimer();
 
   /* initializations */
 
-  time_t t1, t2;
-  t1 = time(&t1);
   srand48(1234);
   lsqrtpi = log(sqrt(PI));
   set_implemented_models();
@@ -3371,8 +3372,6 @@ int main(int argc, char** argv)
     file_output(&(dataset[0]), v_optimal, model_list, saturated_maxlnL, neutral_maxlnL, neutral_oer, neutral_neut, alpha_basic, alpha_FWW, output);
   }
 
-  t2 = time(&t2);
-
-  cout << endl << "Running time: ";
-  printtime(difftime(t2, t1));
+  // We're done! Outputing computation time...
+  grapes.done();
 }
