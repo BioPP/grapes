@@ -2643,7 +2643,7 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
 
 
   // header
-  fprintf(out, "dataset,pn,Lpn,ps,Lps,dn,Ldn,ds,Lds,model,#param,lnL,alpha,alpha_down,alpha_up,omegaA,omegaA_down,omegaA_up,");
+  fprintf(out, "dataset,pn,Lpn,ps,Lps,dn,Ldn,ds,Lds,model,#param,lnL,alpha,alpha_down,alpha_up,omegaA,omegaA_down,omegaA_up,omegaNA,omegaNA_down,omegaNA_up,");
   fprintf(out, "prop_subst_sdel,prop_subst_wdel,prop_subst_wadv,prop_subst_sadv,Neutral:f0,");
   if (opt.use_syno_orientation_error)
     fprintf(out, "Neutral:syno_orientation_error,");
@@ -2734,7 +2734,7 @@ void file_output(struct onelocus_data* data, vector<struct parameter_point> v_op
     expected = expected_SFS_div(*data, v_optimum[k].DFEM_param, NULL, NULL);
     fprintf(out, "%s,", data->locus_name);
     fprintf(out, "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,", totpN, data->Ln_poly, totpS, data->Ls_poly, data->fixN, data->Ln_div, data->fixS, data->Ls_div);
-    fprintf(out, "%s,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,", v_optimum[k].model_name.c_str(), nbparam, v_optimum[k].lnL, v_optimum[k].alpha, v_optimum[k].alpha_down, v_optimum[k].alpha_up, v_optimum[k].omegaA, v_optimum[k].omegaA_down, v_optimum[k].omegaA_up, v_optimum[k].discr_DFE_fixed[0], v_optimum[k].discr_DFE_fixed[1], v_optimum[k].discr_DFE_fixed[2], v_optimum[k].discr_DFE_fixed[3]);
+    fprintf(out, "%s,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,", v_optimum[k].model_name.c_str(), nbparam, v_optimum[k].lnL, v_optimum[k].alpha, v_optimum[k].alpha_down, v_optimum[k].alpha_up, v_optimum[k].omegaA, v_optimum[k].omegaA_down, v_optimum[k].omegaA_up, v_optimum[k].omegaNA, v_optimum[k].omegaNA_down, v_optimum[k].omegaNA_up, v_optimum[k].discr_DFE_fixed[0], v_optimum[k].discr_DFE_fixed[1], v_optimum[k].discr_DFE_fixed[2], v_optimum[k].discr_DFE_fixed[3]);
     fprintf(out, "NA,");
     if (opt.use_syno_orientation_error)
       fprintf(out, "NA,");
